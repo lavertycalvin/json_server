@@ -1,11 +1,15 @@
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <netdb.h>
 #include <arpa/inet.h>
 #include "json-server.h"
 
-struct sockaddr_in listening_socket_v4;
-struct sockaddr_in6 listening_socket_v6;
+struct addrinfo hints, *matches, *possible;
+int get_info_ret;
+
 int listening_socket_fd = 0;
 
 
@@ -38,18 +42,14 @@ static long get_memory_usage_linux()
 }
 
 void create_listening_socket(){
-
-}
-
-int parse_address_for_version(char *address){
-	int ret = 1;	
-	if(!inet_pton(AF_INET, address, &listening_socket_v4.sin_addr)){
-		//try v6 address
-		ret = inet_pton(AF_INET6, address, &listening_socket_v6.sin6_addr);
+	//loop through returned link list
+	for(possible = matches; possible != NULL; possible = possible->ai_next){
+		//try and create a socket
+	
 	}
 
-
-	return ret;				
+	fprintf(stderr, "No Sockets bound! Exiting...\n");
+	exit(-2);
 }
 
 void select_loop(){
@@ -64,16 +64,26 @@ int main(int argc, char **argv){
 		fprintf(stderr, "Usage: \n");
 		exit(-1);
 	}
+	
+	
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family   = AF_UNSPEC; //either v4 or v6
+	hints.ai_socktype = SOCK_STREAM;
+	
+	
 	if(argc == 2){
 		fprintf(stderr, "Setting TCP port to bind to this address: %s\n", argv[1]);
-		if(!parse_address_for_version(argv[1])){
-			fprintf(stderr, "Unable to assign address.....\n");
-			exit(-1);
-		}
+		if((get_info_ret = getaddrinfo(argv[1], "http", &hints, &matches)) != 0){
+			fprintf(stderr, "Error with addresses: %s\n", gai_strerror(get_info_ret));
+		}	
 	}
 	else{
 		//we were not provided with a binding address, bind to all
-		
+		fprintf(stderr, "Setting TCP port to bind any address!\n");
+		hints.ai_flags    = AI_PASSIVE;
+		if((get_info_ret = getaddrinfo(NULL, "http", &hints, &matches)) != 0){
+			fprintf(stderr, "Error with addresses: %s\n", gai_strerror(get_info_ret));
+		}	
 	}
 
 	
