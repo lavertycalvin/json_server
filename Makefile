@@ -6,7 +6,7 @@ EXEC_SUFFIX=$(OS)-$(PROC)
 
 all:  json-server-$(EXEC_SUFFIX)
 
-trace-$(EXEC_SUFFIX): trace.c
+json-server-$(EXEC_SUFFIX): json-server.c
 	$(CC) $(CFLAGS) -o $@ json-server.c
 
 clean:
