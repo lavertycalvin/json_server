@@ -14,6 +14,13 @@ struct server_stats{
 	int memory_used;
 };
 
+struct client{
+	int   socket_fd;
+	char *readBuffer;
+	char *writeBuffer;
+	int   current_step;
+};
+
 
 /*end json-server.h */
 #endif

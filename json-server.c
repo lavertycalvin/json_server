@@ -1,13 +1,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include "json-server.h"
 
-struct addrinfo hints, *matches, *possible;
+struct addrinfo hints, *matches, *server;
 int get_info_ret;
 
 int listening_socket_fd = 0;
@@ -42,10 +43,27 @@ static long get_memory_usage_linux()
 }
 
 void create_listening_socket(){
+	int bind_ret = 0;
 	//loop through returned link list
-	for(possible = matches; possible != NULL; possible = possible->ai_next){
+	for(server = matches; server != NULL; server = server->ai_next){
 		//try and create a socket
-	
+		listening_socket_fd = socket(server->ai_family, server->ai_socktype, server->ai_protocol);	
+		if(listening_socket_fd == -1){
+			//error creating the socket
+			fprintf(stderr, "Create socket error...\n");
+			continue;
+		}
+		fprintf(stderr, "Designated FD for listening socket: %d\n", listening_socket_fd);
+		bind_ret = bind(listening_socket_fd, server->ai_addr, server->ai_addrlen);
+		if(bind_ret == -1){
+			close(listening_socket_fd);
+			fprintf(stderr, "Bind error... \n");
+			continue;
+		}
+		//don't create and bind to more than one socket
+		
+		return;
+
 	}
 
 	fprintf(stderr, "No Sockets bound! Exiting...\n");
@@ -55,6 +73,18 @@ void create_listening_socket(){
 void select_loop(){
 	fprintf(stderr, "Starting select loop\n");
 	while(1);
+}
+
+/* returns port in host order */
+int getport(struct sockaddr *server){
+	int port = 0;
+	if(server->sa_family == AF_INET){
+		port = ((struct sockaddr_in *)server)->sin_port
+	}
+	else{
+	
+	}
+	return ntohs(port);
 }
 
 int main(int argc, char **argv){
@@ -68,29 +98,44 @@ int main(int argc, char **argv){
 	
 	memset(&hints, 0, sizeof(struct addrinfo));
 	hints.ai_family   = AF_UNSPEC; //either v4 or v6
-	hints.ai_socktype = SOCK_STREAM;
-	
-	
+	hints.ai_socktype = SOCK_STREAM; //tcp 
+
 	if(argc == 2){
 		fprintf(stderr, "Setting TCP port to bind to this address: %s\n", argv[1]);
-		if((get_info_ret = getaddrinfo(argv[1], "http", &hints, &matches)) != 0){
+		if((get_info_ret = getaddrinfo(argv[1], NULL, &hints, &matches)) != 0){
 			fprintf(stderr, "Error with addresses: %s\n", gai_strerror(get_info_ret));
 		}	
 	}
 	else{
 		//we were not provided with a binding address, bind to all
 		fprintf(stderr, "Setting TCP port to bind any address!\n");
-		hints.ai_flags    = AI_PASSIVE;
-		if((get_info_ret = getaddrinfo(NULL, "http", &hints, &matches)) != 0){
+		hints.ai_flags    = AI_PASSIVE; //bind to all addresses
+		if((get_info_ret = getaddrinfo(NULL, NULL, &hints, &matches)) != 0){
 			fprintf(stderr, "Error with addresses: %s\n", gai_strerror(get_info_ret));
 		}	
 	}
 
 	
-	create_listening_socket();	
-	
+	create_listening_socket();
+	//done binding address, so we need to free address info
+	freeaddrinfo(matches);
+
+	//listen on server socket
+	//change this 34 to a better number later!
+	if(listen(listening_socket_fd, 34) != 0){
+		fprintf(stderr, "Unable to listen on server socket\n");
+		exit(-3);
+	}
+
+	if(getsockname(listening_socket_fd, (struct sockaddr *)&server->ai_addr, &server->ai_addrlen) == -1){
+		fprintf(stderr, "Unable to get socket name!\n");
+		exit(-4);
+	}
+
+	struct sockaddr_in server_address;
+	int port = getport(server->ai_addr);
 	fprintf(stdout, "HTTP server is using TCP port %d\n"
-			"HTTPS server is using TCP port -1\n", listening_socket_fd);
+			"HTTPS server is using TCP port -1\n", ntohs(server->ai_addr->);
 
 	fflush(stdout);
 
