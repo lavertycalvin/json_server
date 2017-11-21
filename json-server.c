@@ -28,6 +28,8 @@ int largest_fd;
 struct client *all_clients;
 int max_client_size = 100;
 
+
+
 void server_exit(){
 	interrupt = 1; 
 }
@@ -72,6 +74,12 @@ static long get_memory_usage_linux()
 			&num_threads, &itrealvalue, &starttime, &vsize, &rss);
 	fclose(stat);
 	return vsize;
+}
+
+void update_server_info(){
+	
+	server_info.memory_used = get_memory_usage_linux();
+
 }
 
 void create_listening_socket(char *char_address){
@@ -154,13 +162,21 @@ void create_new_connection(){
 	setup_new_client(new_client_fd);
 }
 
+//returns the position of the character BEFORE the newline character
 int is_full_response(struct client *process_client){
+	int ret = 0;
 	process_client->read_buffer -= process_client->bytes_read; //move pointer to beginning of buffer
 	fprintf(stderr, "\nWE HAVE RECEIVED THIS SO FAR:\n%s\n", process_client->read_buffer);
 	//basically loop through until we find a newline
+	int i = 0;
+	for(; i < process_client->bytes_read; i++){
+		if(process_client->read_buffer[i] == '\0'){
+			ret = i - 1;
+		}
+	}
 	
 	process_client->read_buffer += process_client->bytes_read; //if not a full response, return pointer
-	return 0;
+	return ret;
 }
 
 /* resizes the buffer of a client whose buffer has filled
@@ -172,6 +188,7 @@ void resize_buffer(struct client *full_client, int buffer){
 	fprintf(stderr, "\n"
 			"========================================\n"
 			"             RESIZING BUFFER!!!         \n"
+			"========================================\n"
 			"\n");
 	
 	char *rw_buffer = NULL;
@@ -196,12 +213,108 @@ void resize_buffer(struct client *full_client, int buffer){
 	}	
 }
 
-void process_request(struct client *waiting_client){
+
+void fulfill_fortune(){
 
 }
 
-void write_to_client(struct client *client_response){
+int get_response_size(char *buffer){
+	int size = 0;
+	while(buffer[size] != '\0'){
+		size++;
+	}
+	return size;
+}
 
+/* type indicates what to fill the buffer with:
+ * IMPLEMENTED_TYPE
+ * ABOUT_TYPE
+ * STATUS_TYPE
+ * FORTUNE_TYPE
+ * 404_TYPE	
+ */
+void fill_write_buffer(struct client *processed_client, int type){
+	if(type == TYPE_IMPLEMENTED){
+		strcpy(processed_client->write_buffer, IMPLEMENTED_RESPONSE);
+		processed_client->current_step = WRITE_STATE;
+	}
+	else if(type == TYPE_ABOUT){
+		strcpy(processed_client->write_buffer, ABOUT_RESPONSE);
+		processed_client->current_step = WRITE_STATE;
+	}
+	else if(type == TYPE_FORTUNE){
+		//fork and exec here and then return to main loop to read
+	}
+	else if(type == TYPE_STATUS){
+		//get all the system info, fill the buffer then return
+	}
+	else if(type == TYPE_404){
+		strcpy(processed_client->write_buffer, ERROR_404); 
+		processed_client->current_step = WRITE_STATE;
+	}
+	else{
+		fprintf(stderr, "I don't know how to fill this write buffer yet!\n");
+	}
+	//fprintf(stderr, "In client write buffer:\n%s\n", processed_client->write_buffer);
+	
+	processed_client->response_size = get_response_size(processed_client->write_buffer);
+	//fprintf(stderr, "Size of response is %d\n", processed_client->response_size);
+	//we have to return to the main select loop	
+}
+
+void process_request(struct client *waiting_client, int end_buffer){
+	int fill_write_buffer_type = 0;
+	//fprintf(stderr, "The position of the end of our buffer is: %d\n", end_buffer);
+	
+	//implemented request
+	if((end_buffer >= IMPLEMENTED_REQUEST_LENGTH) && !strncmp(waiting_client->read_buffer, IMPLEMENTED_REQUEST, end_buffer)){
+		//fprintf(stderr, "We have a /json/implemented.json request!\n");
+		fill_write_buffer_type = TYPE_IMPLEMENTED;
+	}
+	//about request
+	else if((end_buffer >= ABOUT_REQUEST_LENGTH) && !strncmp(waiting_client->read_buffer, ABOUT_REQUEST, end_buffer)){
+		//fprintf(stderr, "We have a /json/about.json request!\n");
+		fill_write_buffer_type = TYPE_ABOUT;
+	}
+	//status request
+	else if((end_buffer >= STATUS_REQUEST_LENGTH) && !strncmp(waiting_client->read_buffer, STATUS_REQUEST, end_buffer)){
+		fprintf(stderr, "We have a /json/status.json request\n");
+	}
+	//fortune request
+	else if((end_buffer >= FORTUNE_REQUEST_LENGTH) && !strncmp(waiting_client->read_buffer, FORTUNE_REQUEST, end_buffer)){
+		fprintf(stderr, "We have a /json/fortune request!\n");
+	}
+	else{
+		fprintf(stderr, "Send a 404 request because this is WHACKY!\n");
+		fill_write_buffer_type = TYPE_404;
+	}
+	//close the socket after receiving a response
+	fill_write_buffer(waiting_client, fill_write_buffer_type);
+}
+
+
+void close_client_connection(struct client *finished_client){
+	free_client_buffers(finished_client); //free all memory associated with the client's buffers
+	finished_client->is_alive = 0; //mark as dead
+	finished_client->current_step = 'D'; //another mark as 'dead'
+	close(finished_client->socket_fd);	
+}
+
+void write_to_client(struct client *client_response){
+	int bytes_sent = 0;
+	int bytes_available = client_response->response_size - client_response->bytes_written;
+	
+	//fprintf(stderr, "We need to write %d more bytes to this client\n", bytes_available);
+	bytes_sent = send(client_response->socket_fd, client_response->write_buffer, bytes_available, 0); 
+	client_response->bytes_written += bytes_sent;
+	client_response->write_buffer  += bytes_sent; //move buffer pointer along!
+	//fprintf(stderr, "Bytes received so far: %d\n", client_request->bytes_read);
+	
+	//check to see if we have finished sending the response
+	if(client_response->bytes_written == client_response->response_size){
+		client_response->write_buffer -= client_response->bytes_written;//move the buffer back for free
+		close_client_connection(client_response);
+	}
 }
 
 void read_from_client(struct client *client_request){
@@ -215,16 +328,19 @@ void read_from_client(struct client *client_request){
 	}
 	
 	//fprintf(stderr, "We have room for %d more bytes in read buffer for this client\n", bytes_available);
-	bytes_received = recv(client_request->socket_fd, client_request->read_buffer, bytes_available , 0); 
+	bytes_received = recv(client_request->socket_fd, client_request->read_buffer, bytes_available, 0); 
 	client_request->bytes_read  += bytes_received;
 	client_request->read_buffer += bytes_received; //move buffer pointer along!
 	//fprintf(stderr, "Bytes received so far: %d\n", client_request->bytes_read);
 	
+	int end_buffer = 0;
 	//check if full response
-	if(is_full_response(client_request)){
+	if((end_buffer = is_full_response(client_request))){
 		//make sure to change the status of this fd in process_request
-		fprintf(stderr, "We can move on to process request now!\n");
-		process_request(client_request);
+		//fprintf(stderr, "We can move on to process request now!\n");
+		//move read buffer back to the beginning for parsing!
+		client_request->read_buffer -= client_request->bytes_read; //move buffer pointer along!
+		process_request(client_request, end_buffer);
 	}
 }
 
@@ -270,6 +386,9 @@ void remake_select_sets(){
 			}
 			else if(all_clients[i].current_step == WRITE_STATE){
 				FD_SET(all_clients[i].socket_fd, &write_sockets);
+			}
+			else{
+				fprintf(stderr, "We have a client in an undefined state!\n");
 			}
 		}
 	}
@@ -390,16 +509,16 @@ int main(int argc, char **argv){
 	fflush(stdout);
 
 	/* setup all clients struct */
-	all_clients = realloc(all_clients, sizeof(struct client) * max_client_size);
+	all_clients = calloc(sizeof(struct client),  max_client_size);
 	if(all_clients == NULL){
 		fprintf(stderr, "Unable to hold %d clients! Exiting...\n", max_client_size);
 		server_exit();
 	}
 	
-	get_memory_usage_linux();
 	select_loop();
 	
 	
+	free(all_clients);
 	fprintf(stderr, "Server exiting cleanly\n");
 	return 0;
 }
