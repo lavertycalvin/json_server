@@ -8,6 +8,9 @@
 #include <netdb.h>
 #include <fcntl.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+#include "smartalloc.h"
 #include "json-server.h"
 
 
@@ -48,7 +51,6 @@ void make_non_blocking(int fd){
 	}
 }
 
-
 static long get_memory_usage_linux()
 {
 	//Variables to store all the contents of the stat file
@@ -76,10 +78,52 @@ static long get_memory_usage_linux()
 	return vsize;
 }
 
-void update_server_info(){
-	
-	server_info.memory_used = get_memory_usage_linux();
+void construct_header_response(struct client *needy_client){
+	//take in a client and see what they need: 1.1 or 1.0 response
+	//leave the content-length empty
+	sprintf(needy_client->write_buffer, 
+			"HTTP/%.1f 200 OK\n"
+			"Content-Type: application/json\n"
+			"Content-Length: ", needy_client->response_http_version);
 
+}
+
+void create_server_info_response(struct client *curious_client){
+	char temp_info[600];
+	int info_length = 0;
+	struct rusage *times = malloc(sizeof(struct rusage)); 
+	if(times == NULL){
+		fprintf(stderr, "Unable to malloc for structure for 'getrusage'\n");
+		exit(-10);
+	}
+	if(getrusage(RUSAGE_SELF, times) == -1){
+		fprintf(stderr, "Unable to update the user and cpu times!\n");
+		exit(-11);
+	}
+	server_info.cpu_time  = times->ru_stime.tv_sec + (times->ru_stime.tv_usec * 0.0000001);
+	server_info.cpu_time += times->ru_utime.tv_sec + (times->ru_utime.tv_usec * 0.0000001);
+	
+	free(times);
+	server_info.memory_used = get_memory_usage_linux();
+	fprintf(stderr, "Alright, Let's see if we can do that status thing!\n");	
+	
+	//can't write into the buffer until we know how long this is!
+	sprintf(temp_info, "{\n"
+			" \"num_clients\": %d,\n"
+			" \"num_requests\": %d,\n"
+			" \"errors\": %d,\n"
+			" \"uptime\": %f,\n"
+			" \"cpu_time\": %f,\n"
+			" \"memory_used\": %ld,\n"
+			"}\n",
+			server_info.num_clients, server_info.num_requests,
+			server_info.errors, server_info.uptime, server_info.cpu_time,
+			server_info.memory_used);
+	
+	fprintf(stderr, "Here is the content of temp_info:\n%s\n", temp_info);
+	info_length = strlen(temp_info);
+	curious_client->response_size += sprintf(curious_client->write_buffer, GENERIC_HEADER, curious_client->response_http_version, info_length); //copy in header	
+	curious_client->response_size += sprintf(curious_client->write_buffer + curious_client->response_size, "%s", temp_info); //copy in the status
 }
 
 void create_listening_socket(char *char_address){
@@ -105,7 +149,7 @@ void create_listening_socket(char *char_address){
 		return;
 
 	}
-
+	
 	fprintf(stderr, "address '%s' didn't parse (v4 or v6)\n", char_address);
 	exit(-2);
 }
@@ -114,6 +158,17 @@ void create_listening_socket(char *char_address){
 void free_client_buffers(struct client *finished){
 	free(finished->read_buffer);
 	free(finished->write_buffer);
+}
+
+void clear_all_clients(){
+	int i = 0;
+	for(; i < max_client_size; i++){
+		if(all_clients[i].is_alive){
+			free_client_buffers(&all_clients[i]);
+		}
+	}
+	//finally, free the struct
+	free(all_clients);
 }
 
 void resize_clients(){
@@ -138,8 +193,8 @@ void setup_new_client(int fd){
 	all_clients[server_info.num_clients].read_buffer_size   = 400;
 	all_clients[server_info.num_clients].write_buffer_size  = 400;
 	//make sure to change these if initial buffer size changes!
-	all_clients[server_info.num_clients].read_buffer   	= malloc(sizeof(char) * 400);
-	all_clients[server_info.num_clients].write_buffer  	= malloc(sizeof(char) * 400);
+	all_clients[server_info.num_clients].read_buffer   	= calloc(sizeof(char),  400);
+	all_clients[server_info.num_clients].write_buffer  	= calloc(sizeof(char),  400);
 	if(all_clients[server_info.num_clients].read_buffer == NULL ||
 	   all_clients[server_info.num_clients].write_buffer == NULL){
 		fprintf(stderr, "Unable to initialize buffers for client %d. Exiting...\n", server_info.num_clients);
@@ -167,13 +222,23 @@ int is_full_response(struct client *process_client){
 	int ret = 0;
 	process_client->read_buffer -= process_client->bytes_read; //move pointer to beginning of buffer
 	fprintf(stderr, "\nWE HAVE RECEIVED THIS SO FAR:\n%s\n", process_client->read_buffer);
-	//basically loop through until we find a newline
-	int i = 0;
-	for(; i < process_client->bytes_read; i++){
-		if(process_client->read_buffer[i] == '\0'){
-			ret = i - 1;
+	//if there is a specification of HTTP/1.1 we need to look for two newlines
+	if(strstr(process_client->read_buffer, "HTTP/1.1\r\n") != NULL){
+		if(strstr(process_client->read_buffer, "\r\n\r\n") != NULL){
+			ret = 1;
+			process_client->response_http_version = 1.1;
 		}
 	}
+	else{
+		if(strstr(process_client->read_buffer, "\r\n") != NULL){
+			ret = 1;
+			process_client->response_http_version = 1.0;
+		}
+		
+	}
+	//else we need to look for just a single newline
+	
+	//basically loop through until we find a newline
 	
 	process_client->read_buffer += process_client->bytes_read; //if not a full response, return pointer
 	return ret;
@@ -213,17 +278,9 @@ void resize_buffer(struct client *full_client, int buffer){
 	}	
 }
 
-
-void fulfill_fortune(){
-
-}
-
-int get_response_size(char *buffer){
-	int size = 0;
-	while(buffer[size] != '\0'){
-		size++;
-	}
-	return size;
+void fulfill_fortune(struct client *superstitious_client){
+	//lol you thought I would implement this so soon???
+	
 }
 
 /* type indicates what to fill the buffer with:
@@ -235,21 +292,29 @@ int get_response_size(char *buffer){
  */
 void fill_write_buffer(struct client *processed_client, int type){
 	if(type == TYPE_IMPLEMENTED){
-		strcpy(processed_client->write_buffer, IMPLEMENTED_RESPONSE);
+		sprintf(processed_client->write_buffer, IMPLEMENTED_RESPONSE, processed_client->response_http_version);
 		processed_client->current_step = WRITE_STATE;
 	}
 	else if(type == TYPE_ABOUT){
-		strcpy(processed_client->write_buffer, ABOUT_RESPONSE);
+		sprintf(processed_client->write_buffer, ABOUT_RESPONSE, processed_client->response_http_version);
 		processed_client->current_step = WRITE_STATE;
-	}
-	else if(type == TYPE_FORTUNE){
-		//fork and exec here and then return to main loop to read
 	}
 	else if(type == TYPE_STATUS){
 		//get all the system info, fill the buffer then return
+		create_server_info_response(processed_client);
+		processed_client->current_step = WRITE_STATE;
+	}
+	else if(type == TYPE_FORTUNE){
+		//fork and exec here and then return to main loop to read from new fd
+		processed_client->current_step = FORTUNE_STATE;
+	}
+	else if(type == TYPE_QUIT){
+		//send the response and then close down the system
+		sprintf(processed_client->write_buffer, QUIT_RESPONSE, processed_client->response_http_version);
+		processed_client->current_step = QUIT_STATE;
 	}
 	else if(type == TYPE_404){
-		strcpy(processed_client->write_buffer, ERROR_404); 
+		sprintf(processed_client->write_buffer, ERROR_404, processed_client->response_http_version);
 		processed_client->current_step = WRITE_STATE;
 	}
 	else{
@@ -257,37 +322,49 @@ void fill_write_buffer(struct client *processed_client, int type){
 	}
 	//fprintf(stderr, "In client write buffer:\n%s\n", processed_client->write_buffer);
 	
-	processed_client->response_size = get_response_size(processed_client->write_buffer);
+	processed_client->response_size = strlen(processed_client->write_buffer);
 	//fprintf(stderr, "Size of response is %d\n", processed_client->response_size);
 	//we have to return to the main select loop	
 }
 
-void process_request(struct client *waiting_client, int end_buffer){
+void process_request(struct client *waiting_client){
 	int fill_write_buffer_type = 0;
-	//fprintf(stderr, "The position of the end of our buffer is: %d\n", end_buffer);
 	
 	//implemented request
-	if((end_buffer >= IMPLEMENTED_REQUEST_LENGTH) && !strncmp(waiting_client->read_buffer, IMPLEMENTED_REQUEST, end_buffer)){
-		//fprintf(stderr, "We have a /json/implemented.json request!\n");
+	if(		strstr(waiting_client->read_buffer, IMPLEMENTED_REQUEST_SPACE)   != NULL ||
+			strstr(waiting_client->read_buffer, IMPLEMENTED_REQUEST_NEWLINE) != NULL){
+		fprintf(stderr, "We have a /json/implemented.json request!\n");
 		fill_write_buffer_type = TYPE_IMPLEMENTED;
 	}
 	//about request
-	else if((end_buffer >= ABOUT_REQUEST_LENGTH) && !strncmp(waiting_client->read_buffer, ABOUT_REQUEST, end_buffer)){
-		//fprintf(stderr, "We have a /json/about.json request!\n");
+	else if(	strstr(waiting_client->read_buffer, ABOUT_REQUEST_SPACE)   != NULL ||
+			strstr(waiting_client->read_buffer, ABOUT_REQUEST_NEWLINE) != NULL){
+		fprintf(stderr, "We have a /json/about.json request!\n");
 		fill_write_buffer_type = TYPE_ABOUT;
 	}
 	//status request
-	else if((end_buffer >= STATUS_REQUEST_LENGTH) && !strncmp(waiting_client->read_buffer, STATUS_REQUEST, end_buffer)){
+	else if(	strstr(waiting_client->read_buffer, STATUS_REQUEST_SPACE)   != NULL ||
+			strstr(waiting_client->read_buffer, STATUS_REQUEST_NEWLINE) != NULL){
 		fprintf(stderr, "We have a /json/status.json request\n");
+		fill_write_buffer_type = TYPE_STATUS;
 	}
 	//fortune request
-	else if((end_buffer >= FORTUNE_REQUEST_LENGTH) && !strncmp(waiting_client->read_buffer, FORTUNE_REQUEST, end_buffer)){
+	else if(	strstr(waiting_client->read_buffer, FORTUNE_REQUEST_SPACE)   != NULL ||
+			strstr(waiting_client->read_buffer, FORTUNE_REQUEST_NEWLINE) != NULL){
 		fprintf(stderr, "We have a /json/fortune request!\n");
+		fill_write_buffer_type = TYPE_FORTUNE;
+	}
+	//quit request
+	else if(	strstr(waiting_client->read_buffer, QUIT_REQUEST_SPACE)   != NULL || 
+			strstr(waiting_client->read_buffer, QUIT_REQUEST_NEWLINE) != NULL){
+		fprintf(stderr, "We have a /json/quit request!\n");
+		fill_write_buffer_type = TYPE_QUIT;
 	}
 	else{
 		fprintf(stderr, "Send a 404 request because this is WHACKY!\n");
 		fill_write_buffer_type = TYPE_404;
 	}
+	
 	//close the socket after receiving a response
 	fill_write_buffer(waiting_client, fill_write_buffer_type);
 }
@@ -296,7 +373,6 @@ void process_request(struct client *waiting_client, int end_buffer){
 void close_client_connection(struct client *finished_client){
 	free_client_buffers(finished_client); //free all memory associated with the client's buffers
 	finished_client->is_alive = 0; //mark as dead
-	finished_client->current_step = 'D'; //another mark as 'dead'
 	close(finished_client->socket_fd);	
 }
 
@@ -314,6 +390,11 @@ void write_to_client(struct client *client_response){
 	if(client_response->bytes_written == client_response->response_size){
 		client_response->write_buffer -= client_response->bytes_written;//move the buffer back for free
 		close_client_connection(client_response);
+		if(client_response->current_step == QUIT_STATE){
+			//close all other clients and definitely just shut everything down
+			clear_all_clients();
+			server_exit();
+		}
 	}
 }
 
@@ -324,7 +405,9 @@ void read_from_client(struct client *client_request){
 	if(bytes_available == 0){
 		client_request->read_buffer -= client_request->read_buffer_size;//move the buffer back for realloc
 		resize_buffer(client_request, RESIZE_READ_BUFFER);
-		client_request->read_buffer += client_request->read_buffer_size;//and replace it
+		client_request->read_buffer += client_request->bytes_read;//and replace it to how much we read
+		//also update how much room we have to read since we just resized
+		bytes_available = client_request->read_buffer_size - client_request->bytes_read;
 	}
 	
 	//fprintf(stderr, "We have room for %d more bytes in read buffer for this client\n", bytes_available);
@@ -333,14 +416,13 @@ void read_from_client(struct client *client_request){
 	client_request->read_buffer += bytes_received; //move buffer pointer along!
 	//fprintf(stderr, "Bytes received so far: %d\n", client_request->bytes_read);
 	
-	int end_buffer = 0;
 	//check if full response
-	if((end_buffer = is_full_response(client_request))){
+	if(is_full_response(client_request)){
 		//make sure to change the status of this fd in process_request
 		//fprintf(stderr, "We can move on to process request now!\n");
 		//move read buffer back to the beginning for parsing!
-		client_request->read_buffer -= client_request->bytes_read; //move buffer pointer along!
-		process_request(client_request, end_buffer);
+		client_request->read_buffer -= client_request->bytes_read; //move buffer back to beginning
+		process_request(client_request);
 	}
 }
 
@@ -362,8 +444,13 @@ void handle_all_sockets(){
 				//can write to this client	
 				write_to_client(&all_clients[i]);
 			}
+			//check to see if we need to read from a fortune
+			else if(all_clients[i].fortune_fd != 0 && FD_ISSET(all_clients[i].fortune_fd, &read_sockets)){
+				//we need to fulfill a fortune!
+				fulfill_fortune(&all_clients[i]);
+			}	
 			else{
-				//fprintf(stderr, "client is alive but not set for read or write\n");
+				fprintf(stderr, "client is alive but not set for read or write\n");
 			}
 		}	
 	}
@@ -385,6 +472,14 @@ void remake_select_sets(){
 				FD_SET(all_clients[i].socket_fd, &read_sockets);
 			}
 			else if(all_clients[i].current_step == WRITE_STATE){
+				FD_SET(all_clients[i].socket_fd, &write_sockets);
+			}
+			else if(all_clients[i].current_step == FORTUNE_STATE){
+				//TO DO
+				//mark the client's connect fd to the forked fortune as read
+			}
+			else if(all_clients[i].current_step == QUIT_STATE){
+				//still set to write.. not sure if we need to do anything else
 				FD_SET(all_clients[i].socket_fd, &write_sockets);
 			}
 			else{
@@ -518,7 +613,6 @@ int main(int argc, char **argv){
 	select_loop();
 	
 	
-	free(all_clients);
 	fprintf(stderr, "Server exiting cleanly\n");
 	return 0;
 }

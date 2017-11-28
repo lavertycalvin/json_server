@@ -7,7 +7,7 @@ EXEC_SUFFIX=$(OS)-$(PROC)
 all:  json-server-$(EXEC_SUFFIX)
 
 json-server-$(EXEC_SUFFIX): json-server.c
-	$(CC) $(CFLAGS) -o $@ json-server.c
+	$(CC) $(CFLAGS) -o $@ smartalloc.c json-server.c
 
 clean:
 	-rm -rf json-server-*
