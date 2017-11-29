@@ -168,7 +168,6 @@ void clear_all_clients(){
 		}
 	}
 	//finally, free the struct
-	free(all_clients);
 }
 
 void resize_clients(){
