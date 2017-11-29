@@ -80,6 +80,7 @@ struct client{
 
 #define ABOUT_REQUEST_SPACE 	"/json/about.json "
 #define ABOUT_REQUEST_NEWLINE 	"/json/about.json\r\n"
+
 #define ABOUT_RESPONSE  "HTTP/%.1f 200 OK\n"\
 			"Content-Type: application/json\n"\
 			"Content-Length: 81\n"\
