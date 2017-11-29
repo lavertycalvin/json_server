@@ -614,6 +614,6 @@ int main(int argc, char **argv){
 	
 	
 	free(all_clients);
-	fprintf(stderr, "Server exiting cleanly\n");
+	fprintf(stdout, "Server exiting cleanly\n");
 	return 0;
 }
