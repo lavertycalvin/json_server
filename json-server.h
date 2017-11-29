@@ -1,4 +1,5 @@
 /*json-server.h
+ *
  * 
  *
  * holds all constants necessary for an event-driven json web server
@@ -29,8 +30,8 @@ struct server_stats{
 	int num_clients;
 	int num_requests;
 	int errors;
-	float uptime;
-	float cpu_time;
+	long uptime;
+	long cpu_time;
 	long memory_used;
 };
 
@@ -79,6 +80,7 @@ struct client{
 
 #define ABOUT_REQUEST_SPACE 	"/json/about.json "
 #define ABOUT_REQUEST_NEWLINE 	"/json/about.json\r\n"
+
 #define ABOUT_RESPONSE  "HTTP/%.1f 200 OK\n"\
 			"Content-Type: application/json\n"\
 			"Content-Length: 81\n"\

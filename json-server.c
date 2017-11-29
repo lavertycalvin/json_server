@@ -91,19 +91,13 @@ void construct_header_response(struct client *needy_client){
 void create_server_info_response(struct client *curious_client){
 	char temp_info[600];
 	int info_length = 0;
-	struct rusage *times = malloc(sizeof(struct rusage)); 
-	if(times == NULL){
-		fprintf(stderr, "Unable to malloc for structure for 'getrusage'\n");
-		exit(-10);
-	}
-	if(getrusage(RUSAGE_SELF, times) == -1){
+	struct rusage times; 
+	if(getrusage(RUSAGE_SELF, &times) == -1){
 		fprintf(stderr, "Unable to update the user and cpu times!\n");
+		fprintf(stdout, "Server exiting cleanly");
 		exit(-11);
 	}
-	server_info.cpu_time  = times->ru_stime.tv_sec + (times->ru_stime.tv_usec * 0.0000001);
-	server_info.cpu_time += times->ru_utime.tv_sec + (times->ru_utime.tv_usec * 0.0000001);
 	
-	free(times);
 	server_info.memory_used = get_memory_usage_linux();
 	fprintf(stderr, "Alright, Let's see if we can do that status thing!\n");	
 	
@@ -112,12 +106,15 @@ void create_server_info_response(struct client *curious_client){
 			" \"num_clients\": %d,\n"
 			" \"num_requests\": %d,\n"
 			" \"errors\": %d,\n"
-			" \"uptime\": %f,\n"
-			" \"cpu_time\": %f,\n"
+			" \"uptime\": %ld.%ld,\n"
+			" \"cpu_time\": %ld.%ld,\n"
 			" \"memory_used\": %ld,\n"
 			"}\n",
-			server_info.num_clients, server_info.num_requests,
-			server_info.errors, server_info.uptime, server_info.cpu_time,
+			server_info.num_clients, 
+			server_info.num_requests,
+			server_info.errors, 
+			times.ru_stime.tv_sec, times.ru_stime.tv_usec, 
+			times.ru_utime.tv_sec, times.ru_utime.tv_usec,
 			server_info.memory_used);
 	
 	fprintf(stderr, "Here is the content of temp_info:\n%s\n", temp_info);
@@ -151,6 +148,7 @@ void create_listening_socket(char *char_address){
 	}
 	
 	fprintf(stderr, "address '%s' didn't parse (v4 or v6)\n", char_address);
+	fprintf(stdout, "Server exiting cleanly");
 	exit(-2);
 }
 
@@ -363,7 +361,9 @@ void process_request(struct client *waiting_client){
 		fprintf(stderr, "Send a 404 request because this is WHACKY!\n");
 		fill_write_buffer_type = TYPE_404;
 	}
-	
+	//add that we got a request
+	server_info.num_requests++;	
+
 	//close the socket after receiving a response
 	fill_write_buffer(waiting_client, fill_write_buffer_type);
 }
@@ -537,7 +537,7 @@ void initialize_server_stats(){
 	server_info.num_clients = 0;
 	server_info.uptime = 0;
 	server_info.cpu_time = 0;
-	server_info.memory_used = get_memory_usage_linux();
+	server_info.memory_used = 0;
 }
 
 int main(int argc, char **argv){
@@ -589,11 +589,13 @@ int main(int argc, char **argv){
 	//change this 34 to a better number later!
 	if(listen(listening_socket_fd, 34) != 0){
 		fprintf(stderr, "Unable to listen on server socket\n");
+		fprintf(stdout, "Server exiting cleanly");
 		exit(-3);
 	}
 
 	if(getsockname(listening_socket_fd, (struct sockaddr *)server->ai_addr, &server->ai_addrlen) == -1){
 		fprintf(stderr, "Unable to get socket name!\n");
+		fprintf(stdout, "Server exiting cleanly");
 		exit(-4);
 	}
 
@@ -613,6 +615,6 @@ int main(int argc, char **argv){
 	
 	
 	free(all_clients);
-	fprintf(stdout, "Server exiting cleanly\n");
+	fprintf(stdout, "Server exiting cleanly");
 	return 0;
 }
