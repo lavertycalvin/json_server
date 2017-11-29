@@ -613,6 +613,7 @@ int main(int argc, char **argv){
 	select_loop();
 	
 	
+	free(all_clients);
 	fprintf(stderr, "Server exiting cleanly\n");
 	return 0;
 }
