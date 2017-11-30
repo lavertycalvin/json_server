@@ -94,7 +94,7 @@ void create_server_info_response(struct client *curious_client){
 	struct rusage times; 
 	if(getrusage(RUSAGE_SELF, &times) == -1){
 		fprintf(stderr, "Unable to update the user and cpu times!\n");
-		fprintf(stdout, "Server exiting cleanly");
+		fprintf(stdout, "Server exiting cleanly.\n");
 		exit(-11);
 	}
 	
@@ -148,7 +148,7 @@ void create_listening_socket(char *char_address){
 	}
 	
 	fprintf(stderr, "address '%s' didn't parse (v4 or v6)\n", char_address);
-	fprintf(stdout, "Server exiting cleanly");
+	fprintf(stdout, "Server exiting cleanly.\n");
 	exit(-2);
 }
 
@@ -590,13 +590,13 @@ int main(int argc, char **argv){
 	//change this 34 to a better number later!
 	if(listen(listening_socket_fd, 34) != 0){
 		fprintf(stderr, "Unable to listen on server socket\n");
-		fprintf(stdout, "Server exiting cleanly");
+		fprintf(stdout, "Server exiting cleanly.\n");
 		exit(-3);
 	}
 
 	if(getsockname(listening_socket_fd, (struct sockaddr *)server->ai_addr, &server->ai_addrlen) == -1){
 		fprintf(stderr, "Unable to get socket name!\n");
-		fprintf(stdout, "Server exiting cleanly");
+		fprintf(stdout, "Server exiting cleanly.\n");
 		exit(-4);
 	}
 
@@ -616,6 +616,6 @@ int main(int argc, char **argv){
 	
 	
 	free(all_clients);
-	fprintf(stdout, "Server exiting cleanly");
+	fprintf(stdout, "Server exiting cleanly.\n");
 	return 0;
 }
