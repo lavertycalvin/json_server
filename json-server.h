@@ -52,42 +52,43 @@ struct client{
 	int   fortune_fd;
 };
 
-#define GENERIC_HEADER 	"HTTP/%.1f 200 OK\n"\
-			"Content-Type: application/json\n"\
-			"Content-Length: %d\n"\
-			"\n"
+#define GENERIC_HEADER 	"HTTP/%.1f 200 OK\r\n"\
+			"Content-Type: application/json\r\n"\
+			"Content-Length: %d\r\n"\
+			"\r\n"
 
-#define ERROR_404 	"HTTP/%.1f 404 Not Found\n"\
-			"Content-Type: text/html\n"\
-			"Content-Length: 162\n"\
-			"\n"\
+#define ERROR_404 	"HTTP/%.1f 404 Not Found\r\n"\
+			"Content-Type: text/html\r\n"\
+			"Content-Length: 162\r\n"\
+			"\r\n"\
 			"<HTML><HEAD><TITLE>HTTP ERROR 404</TITLE></HEAD><BODY>404 Not Found.  "\
 			"Your request could not be completed due to encountering HTTP error number 404."\
-			"</BODY></HTML>\n"
+			"</BODY></HTML>\r\n"
 
 #define IMPLEMENTED_REQUEST_SPACE 	"/json/implemented.json "
 #define IMPLEMENTED_REQUEST_NEWLINE 	"/json/implemented.json\r\n"
 #define IMPLEMENTED_RESPONSE ""\
-			"HTTP/%.1f 200 OK\n"\
-			"Content-Type: application/json\n"\
-			"Content-Length: 193\n"\
-			"\n"\
-			"[\n"\
-			"{ \"feature\": \"about\", \"URL\": \"/json/about.json\"},"\
-			"{ \"feature\": \"quit\", \"URL\": \"/json/quit\"},"\
-			"{ \"feature\": \"status\", \"URL\": \"/json/status.json\"},"\
-			"{ \"feature\": \"fortune\", \"URL\": \"/json/fortune\"}]\n"
+			"HTTP/%.1f 200 OK\r\n"\
+			"Content-Type: application/json\r\n"\
+			"Content-Length: 193\r\n"\
+			"\r\n"\
+			"[\r\n"\
+			"{ \"feature\": \"about\", \"URL\": \"/json/about.json\"},\r\n"\
+			"{ \"feature\": \"quit\", \"URL\": \"/json/quit\"},\r\n"\
+			"{ \"feature\": \"status\", \"URL\": \"/json/status.json\"\r\n},"\
+			"{ \"feature\": \"fortune\", \"URL\": \"/json/fortune\"}\r\n"\
+			"]\r\n"
 
 #define ABOUT_REQUEST_SPACE 	"/json/about.json "
 #define ABOUT_REQUEST_NEWLINE 	"/json/about.json\r\n"
 
-#define ABOUT_RESPONSE  "HTTP/%.1f 200 OK\n"\
-			"Content-Type: application/json\n"\
-			"Content-Length: 81\n"\
-			"\n"\
-			"{\n"\
-			"  \"author\": \"Calvin Laverty\",  \"email\": \"claverty@calpoly.edu\",  \"major\": \"CPE\""\
-			"}\n"
+#define ABOUT_RESPONSE  "HTTP/%.1f 200 OK\r\n"\
+			"Content-Type: application/json\r\n"\
+			"Content-Length: 81\r\n"\
+			"\r\n"\
+			"{\r\n"\
+			"  \"author\": \"Calvin Laverty\",  \"email\": \"claverty@calpoly.edu\",  \"major\": \"CPE\"\r\n"\
+			"}\r\n"
 
 #define STATUS_REQUEST_SPACE 	"/json/status.json "
 #define STATUS_REQUEST_NEWLINE 	"/json/status.json\r\n"
@@ -97,12 +98,12 @@ struct client{
 
 #define QUIT_REQUEST_SPACE 	"/json/quit "
 #define QUIT_REQUEST_NEWLINE 	"/json/quit\r\n"
-#define QUIT_RESPONSE 	"HTTP/%.1f 200 OK\n"\
-			"Content-Type: application/json\n"\
-			"Content-Length: 26\n"\
-			"\n"\
-			"{\n"\
-			"  \"result\": \"success\"\n"\
-			"}\n"
+#define QUIT_RESPONSE 	"HTTP/%.1f 200 OK\r\n"\
+			"Content-Type: application/json\r\n"\
+			"Content-Length: 26\r\n"\
+			"\r\n"\
+			"{\r\n"\
+			"  \"result\": \"success\"\r\n"\
+			"}\r\n"
 /*end json-server.h */
 #endif
