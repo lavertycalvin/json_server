@@ -360,6 +360,7 @@ void process_request(struct client *waiting_client){
 	else{
 		fprintf(stderr, "Send a 404 request because this is WHACKY!\n");
 		fill_write_buffer_type = TYPE_404;
+      server_info.errors++;
 	}
 	//add that we got a request
 	server_info.num_requests++;	
