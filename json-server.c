@@ -393,7 +393,10 @@ void write_to_client(struct client *client_response){
 		if(client_response->current_step == QUIT_STATE){
 			//close all other clients and definitely just shut everything down
 			clear_all_clients();
-			server_exit();
+			fprintf(stderr, "After clear all clients\n");
+			fprintf(stdout, "Server exiting cleanly.\n");
+			free(all_clients);
+			exit(0);
 		}
 	}
 }
