@@ -614,8 +614,8 @@ int main(int argc, char **argv){
 	
 	select_loop();
 	
-	
 	free(all_clients);
+	close(listening_socket_fd);
 	fprintf(stdout, "Server exiting cleanly.\n");
 	return 0;
 }
