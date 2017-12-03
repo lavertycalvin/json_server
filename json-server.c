@@ -99,7 +99,7 @@ void create_server_info_response(struct client *curious_client){
 	}
 	
 	server_info.memory_used = get_memory_usage_linux();
-	fprintf(stderr, "Alright, Let's see if we can do that status thing!\n");	
+	//fprintf(stderr, "Alright, Let's see if we can do that status thing!\n");	
 	
 	//can't write into the buffer until we know how long this is!
 	sprintf(temp_info, "{\n"
@@ -117,7 +117,7 @@ void create_server_info_response(struct client *curious_client){
 			times.ru_utime.tv_sec, times.ru_utime.tv_usec,
 			server_info.memory_used);
 	
-	fprintf(stderr, "Here is the content of temp_info:\n%s\n", temp_info);
+	//fprintf(stderr, "Here is the content of temp_info:\n%s\n", temp_info);
 	info_length = strlen(temp_info);
 	curious_client->response_size += sprintf(curious_client->write_buffer, GENERIC_HEADER, curious_client->response_http_version, info_length); //copy in header	
 	curious_client->response_size += sprintf(curious_client->write_buffer + curious_client->response_size, "%s", temp_info); //copy in the status
@@ -125,6 +125,7 @@ void create_server_info_response(struct client *curious_client){
 
 void create_listening_socket(char *char_address){
 	int bind_ret = 0;
+
 	//loop through returned link list
 	for(server = matches; server != NULL; server = server->ai_next){
 		//try and create a socket
@@ -142,7 +143,6 @@ void create_listening_socket(char *char_address){
 			continue;
 		}
 		//don't create and bind to more than one socket
-		
 		return;
 
 	}
@@ -154,6 +154,8 @@ void create_listening_socket(char *char_address){
 
 
 void free_client_buffers(struct client *finished){
+	finished->write_buffer -= finished->bytes_written;
+	finished->read_buffer  -= finished->bytes_read;
 	free(finished->read_buffer);
 	free(finished->write_buffer);
 }
@@ -218,7 +220,6 @@ void create_new_connection(){
 int is_full_response(struct client *process_client){
 	int ret = 0;
 	process_client->read_buffer -= process_client->bytes_read; //move pointer to beginning of buffer
-	fprintf(stderr, "\nWE HAVE RECEIVED THIS SO FAR:\n%s\n", process_client->read_buffer);
 	//if there is a specification of HTTP/1.1 we need to look for two newlines
 	if(strstr(process_client->read_buffer, "HTTP/1.1\r\n") != NULL){
 		if(strstr(process_client->read_buffer, "\r\n\r\n") != NULL){
@@ -315,7 +316,7 @@ void fill_write_buffer(struct client *processed_client, int type){
 		processed_client->current_step = WRITE_STATE;
 	}
 	else{
-		fprintf(stderr, "I don't know how to fill this write buffer yet!\n");
+		//fprintf(stderr, "I don't know how to fill this write buffer yet!\n");
 	}
 	//fprintf(stderr, "In client write buffer:\n%s\n", processed_client->write_buffer);
 	
@@ -330,35 +331,36 @@ void process_request(struct client *waiting_client){
 	//implemented request
 	if(		strstr(waiting_client->read_buffer, IMPLEMENTED_REQUEST_SPACE)   != NULL ||
 			strstr(waiting_client->read_buffer, IMPLEMENTED_REQUEST_NEWLINE) != NULL){
-		fprintf(stderr, "We have a /json/implemented.json request!\n");
+		//fprintf(stderr, "We have a /json/implemented.json request!\n");
 		fill_write_buffer_type = TYPE_IMPLEMENTED;
 	}
 	//about request
 	else if(	strstr(waiting_client->read_buffer, ABOUT_REQUEST_SPACE)   != NULL ||
 			strstr(waiting_client->read_buffer, ABOUT_REQUEST_NEWLINE) != NULL){
-		fprintf(stderr, "We have a /json/about.json request!\n");
+		//fprintf(stderr, "We have a /json/about.json request!\n");
 		fill_write_buffer_type = TYPE_ABOUT;
 	}
 	//status request
 	else if(	strstr(waiting_client->read_buffer, STATUS_REQUEST_SPACE)   != NULL ||
 			strstr(waiting_client->read_buffer, STATUS_REQUEST_NEWLINE) != NULL){
-		fprintf(stderr, "We have a /json/status.json request\n");
+		//fprintf(stderr, "We have a /json/status.json request\n");
 		fill_write_buffer_type = TYPE_STATUS;
 	}
 	//fortune request
 	else if(	strstr(waiting_client->read_buffer, FORTUNE_REQUEST_SPACE)   != NULL ||
 			strstr(waiting_client->read_buffer, FORTUNE_REQUEST_NEWLINE) != NULL){
-		fprintf(stderr, "We have a /json/fortune request!\n");
+		//fprintf(stderr, "We have a /json/fortune request!\n");
 		fill_write_buffer_type = TYPE_FORTUNE;
 	}
 	//quit request
 	else if(	strstr(waiting_client->read_buffer, QUIT_REQUEST_SPACE)   != NULL || 
 			strstr(waiting_client->read_buffer, QUIT_REQUEST_NEWLINE) != NULL){
-		fprintf(stderr, "We have a /json/quit request!\n");
+		//fprintf(stderr, "We have a /json/quit request!\n");
 		fill_write_buffer_type = TYPE_QUIT;
 	}
 	else{
-		fprintf(stderr, "Send a 404 request because this is WHACKY!\n");
+		//fprintf(stderr, "Send a 404 request because this is WHACKY!\n");
+		//fprintf(stderr, "Request: %s\n", waiting_client->read_buffer);
 		fill_write_buffer_type = TYPE_404;
       server_info.errors++;
 	}
@@ -388,14 +390,14 @@ void write_to_client(struct client *client_response){
 	
 	//check to see if we have finished sending the response
 	if(client_response->bytes_written == client_response->response_size){
-		client_response->write_buffer -= client_response->bytes_written;//move the buffer back for free
 		close_client_connection(client_response);
 		if(client_response->current_step == QUIT_STATE){
 			//close all other clients and definitely just shut everything down
 			clear_all_clients();
-			fprintf(stderr, "After clear all clients\n");
+			//fprintf(stderr, "After clear all clients\n");
 			fprintf(stdout, "Server exiting cleanly.\n");
 			free(all_clients);
+			freeaddrinfo(matches);
 			exit(0);
 		}
 	}
@@ -424,7 +426,8 @@ void read_from_client(struct client *client_request){
 		//make sure to change the status of this fd in process_request
 		//fprintf(stderr, "We can move on to process request now!\n");
 		//move read buffer back to the beginning for parsing!
-		client_request->read_buffer -= client_request->bytes_read; //move buffer back to beginning
+		client_request->read_buffer -= client_request->bytes_read;//and replace it to how much we read
+		client_request->bytes_read = 0; //testing for free in client buffers
 		process_request(client_request);
 	}
 }
@@ -453,7 +456,7 @@ void handle_all_sockets(){
 				fulfill_fortune(&all_clients[i]);
 			}	
 			else{
-				fprintf(stderr, "client is alive but not set for read or write\n");
+				//fprintf(stderr, "client is alive but not set for read or write\n");
 			}
 		}	
 	}
@@ -486,7 +489,7 @@ void remake_select_sets(){
 				FD_SET(all_clients[i].socket_fd, &write_sockets);
 			}
 			else{
-				fprintf(stderr, "We have a client in an undefined state!\n");
+				//fprintf(stderr, "We have a client in an undefined state!\n");
 			}
 		}
 	}
@@ -538,10 +541,12 @@ void sigint_handler(int sig){
 }
 
 void initialize_server_stats(){
-	server_info.num_clients = 0;
-	server_info.uptime = 0;
-	server_info.cpu_time = 0;
-	server_info.memory_used = 0;
+	server_info.num_clients  = 0;
+	server_info.num_requests = 0;
+	server_info.errors 	 = 0;
+	server_info.uptime 	 = 0;
+	server_info.cpu_time 	 = 0;
+	server_info.memory_used  = 0;
 }
 
 int main(int argc, char **argv){
@@ -583,7 +588,7 @@ int main(int argc, char **argv){
 	
 	create_listening_socket(argv[1]);
 	//done binding address, so we need to free address info
-	freeaddrinfo(matches);
+	//fprintf(stderr, "WTF IS THIS MANNNN>>>>>>>>>\n\n\n\n");
 
 	make_non_blocking(listening_socket_fd);
 	largest_fd = listening_socket_fd;	
@@ -619,6 +624,7 @@ int main(int argc, char **argv){
 	
 	free(all_clients);
 	close(listening_socket_fd);
+	freeaddrinfo(server);
 	fprintf(stdout, "Server exiting cleanly.\n");
 	return 0;
 }

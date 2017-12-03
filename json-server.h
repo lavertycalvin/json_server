@@ -13,6 +13,7 @@
 #define WRITE_STATE 	30
 #define FORTUNE_STATE 	40
 #define QUIT_STATE	50
+#define DYING_STATE     60
 
 #define RESIZE_READ_BUFFER   444
 #define RESIZE_WRITE_BUFFER  555
@@ -75,7 +76,7 @@ struct client{
 			"[\r\n"\
 			"{ \"feature\": \"about\", \"URL\": \"/json/about.json\"},\r\n"\
 			"{ \"feature\": \"quit\", \"URL\": \"/json/quit\"},\r\n"\
-			"{ \"feature\": \"status\", \"URL\": \"/json/status.json\"\r\n},"\
+			"{ \"feature\": \"status\", \"URL\": \"/json/status.json\"},\r\n"\
 			"{ \"feature\": \"fortune\", \"URL\": \"/json/fortune\"}\r\n"\
 			"]\r\n"
 
