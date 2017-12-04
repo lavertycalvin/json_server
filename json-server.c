@@ -91,7 +91,7 @@ void construct_header_response(struct client *needy_client){
 void create_server_info_response(struct client *curious_client){
 	char *temp_info = malloc(sizeof(char) * 600);
 	int info_length = 0;
-	struct rusage times = {0}; 
+	struct rusage times; 
 	if(getrusage(RUSAGE_SELF, &times) == -1){
 		fprintf(stderr, "Unable to update the user and cpu times!\n");
 		fprintf(stdout, "Server exiting cleanly.\n");
