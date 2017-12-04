@@ -525,9 +525,11 @@ void select_loop(){
 int get_port(struct sockaddr *server){
 	uint16_t port = 0;
 	if(server->sa_family == AF_INET){
+		fprintf(stderr, "Used IPv4 binding!\n");
 		port = ((struct sockaddr_in *)server)->sin_port;
 	}
 	else{
+		fprintf(stderr, "Used IPv6 binding!\n");
 		port = ((struct sockaddr_in6 *)server)->sin6_port;
 	}
 	return ntohs(port);
@@ -588,7 +590,6 @@ int main(int argc, char **argv){
 	
 	create_listening_socket(argv[1]);
 	//done binding address, so we need to free address info
-	//fprintf(stderr, "WTF IS THIS MANNNN>>>>>>>>>\n\n\n\n");
 
 	make_non_blocking(listening_socket_fd);
 	largest_fd = listening_socket_fd;	
