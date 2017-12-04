@@ -51,7 +51,7 @@ void make_non_blocking(int fd){
 	}
 }
 
-static long get_memory_usage_linux()
+unsigned long get_memory_usage_linux()
 {
 	//Variables to store all the contents of the stat file
 	int pid, ppid, pgrp, session, tty_nr, tpgid;
@@ -89,17 +89,14 @@ void construct_header_response(struct client *needy_client){
 }
 
 void create_server_info_response(struct client *curious_client){
-	char temp_info[600];
+	char *temp_info = malloc(sizeof(char) * 600);
 	int info_length = 0;
-	struct rusage times; 
+	struct rusage times = {0}; 
 	if(getrusage(RUSAGE_SELF, &times) == -1){
 		fprintf(stderr, "Unable to update the user and cpu times!\n");
 		fprintf(stdout, "Server exiting cleanly.\n");
 		exit(-11);
 	}
-	
-	server_info.memory_used = get_memory_usage_linux();
-	//fprintf(stderr, "Alright, Let's see if we can do that status thing!\n");	
 	
 	//can't write into the buffer until we know how long this is!
 	sprintf(temp_info, "{\n"
@@ -115,12 +112,13 @@ void create_server_info_response(struct client *curious_client){
 			server_info.errors, 
 			times.ru_stime.tv_sec, times.ru_stime.tv_usec, 
 			times.ru_utime.tv_sec, times.ru_utime.tv_usec,
-			server_info.memory_used);
+			get_memory_usage_linux());
 	
 	//fprintf(stderr, "Here is the content of temp_info:\n%s\n", temp_info);
 	info_length = strlen(temp_info);
 	curious_client->response_size += sprintf(curious_client->write_buffer, GENERIC_HEADER, curious_client->response_http_version, info_length); //copy in header	
 	curious_client->response_size += sprintf(curious_client->write_buffer + curious_client->response_size, "%s", temp_info); //copy in the status
+	free(temp_info);
 }
 
 void create_listening_socket(char *char_address){
@@ -154,8 +152,6 @@ void create_listening_socket(char *char_address){
 
 
 void free_client_buffers(struct client *finished){
-	finished->write_buffer -= finished->bytes_written;
-	finished->read_buffer  -= finished->bytes_read;
 	free(finished->read_buffer);
 	free(finished->write_buffer);
 }
@@ -219,7 +215,6 @@ void create_new_connection(){
 //returns the position of the character BEFORE the newline character
 int is_full_response(struct client *process_client){
 	int ret = 0;
-	process_client->read_buffer -= process_client->bytes_read; //move pointer to beginning of buffer
 	//if there is a specification of HTTP/1.1 we need to look for two newlines
 	if(strstr(process_client->read_buffer, "HTTP/1.1\r\n") != NULL){
 		if(strstr(process_client->read_buffer, "\r\n\r\n") != NULL){
@@ -238,7 +233,6 @@ int is_full_response(struct client *process_client){
 	
 	//basically loop through until we find a newline
 	
-	process_client->read_buffer += process_client->bytes_read; //if not a full response, return pointer
 	return ret;
 }
 
@@ -362,7 +356,7 @@ void process_request(struct client *waiting_client){
 		//fprintf(stderr, "Send a 404 request because this is WHACKY!\n");
 		//fprintf(stderr, "Request: %s\n", waiting_client->read_buffer);
 		fill_write_buffer_type = TYPE_404;
-      server_info.errors++;
+      		server_info.errors++;
 	}
 	//add that we got a request
 	server_info.num_requests++;	
@@ -383,9 +377,8 @@ void write_to_client(struct client *client_response){
 	int bytes_available = client_response->response_size - client_response->bytes_written;
 	
 	//fprintf(stderr, "We need to write %d more bytes to this client\n", bytes_available);
-	bytes_sent = send(client_response->socket_fd, client_response->write_buffer, bytes_available, 0); 
+	bytes_sent = send(client_response->socket_fd, client_response->write_buffer + client_response->bytes_written, bytes_available, 0); 
 	client_response->bytes_written += bytes_sent;
-	client_response->write_buffer  += bytes_sent; //move buffer pointer along!
 	//fprintf(stderr, "Bytes received so far: %d\n", client_request->bytes_read);
 	
 	//check to see if we have finished sending the response
@@ -408,26 +401,20 @@ void read_from_client(struct client *client_request){
 	int bytes_available = client_request->read_buffer_size - client_request->bytes_read;
 	//check to see if we need to make our buffer bigger!
 	if(bytes_available == 0){
-		client_request->read_buffer -= client_request->read_buffer_size;//move the buffer back for realloc
 		resize_buffer(client_request, RESIZE_READ_BUFFER);
-		client_request->read_buffer += client_request->bytes_read;//and replace it to how much we read
 		//also update how much room we have to read since we just resized
 		bytes_available = client_request->read_buffer_size - client_request->bytes_read;
 	}
 	
 	//fprintf(stderr, "We have room for %d more bytes in read buffer for this client\n", bytes_available);
-	bytes_received = recv(client_request->socket_fd, client_request->read_buffer, bytes_available, 0); 
+	bytes_received = recv(client_request->socket_fd, client_request->read_buffer + client_request->bytes_read, bytes_available, 0); 
 	client_request->bytes_read  += bytes_received;
-	client_request->read_buffer += bytes_received; //move buffer pointer along!
-	//fprintf(stderr, "Bytes received so far: %d\n", client_request->bytes_read);
 	
 	//check if full response
 	if(is_full_response(client_request)){
 		//make sure to change the status of this fd in process_request
 		//fprintf(stderr, "We can move on to process request now!\n");
 		//move read buffer back to the beginning for parsing!
-		client_request->read_buffer -= client_request->bytes_read;//and replace it to how much we read
-		client_request->bytes_read = 0; //testing for free in client buffers
 		process_request(client_request);
 	}
 }
