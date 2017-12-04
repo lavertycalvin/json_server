@@ -523,6 +523,7 @@ void remake_select_sets(){
 			else if(all_clients[i].current_step == FORTUNE_STATE){
 				//TO DO
 				//mark the client's connect fd to the forked fortune as read
+				FD_SET(all_clients[i].fortune_fd, &read_sockets);
 			}
 			else if(all_clients[i].current_step == QUIT_STATE){
 				//still set to write.. not sure if we need to do anything else
@@ -565,11 +566,11 @@ void select_loop(){
 int get_port(struct sockaddr *server){
 	uint16_t port = 0;
 	if(server->sa_family == AF_INET){
-		fprintf(stderr, "Used IPv4 binding!\n");
+		//fprintf(stderr, "Used IPv4 binding!\n");
 		port = ((struct sockaddr_in *)server)->sin_port;
 	}
 	else{
-		fprintf(stderr, "Used IPv6 binding!\n");
+		//fprintf(stderr, "Used IPv6 binding!\n");
 		port = ((struct sockaddr_in6 *)server)->sin6_port;
 	}
 	return ntohs(port);
@@ -663,6 +664,8 @@ int main(int argc, char **argv){
 	
 	select_loop();
 	
+
+	clear_all_clients();
 	free(all_clients);
 	close(listening_socket_fd);
 	freeaddrinfo(server);
