@@ -96,6 +96,7 @@ struct client{
 
 #define FORTUNE_REQUEST_SPACE 	"/json/fortune "
 #define FORTUNE_REQUEST_NEWLINE "/json/fortune\r\n"
+#define FORTUNE_HEADER 	"{ \"fortune\": \""
 
 #define QUIT_REQUEST_SPACE 	"/json/quit "
 #define QUIT_REQUEST_NEWLINE 	"/json/quit\r\n"

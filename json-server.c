@@ -271,7 +271,25 @@ void resize_buffer(struct client *full_client, int buffer){
 }
 
 void fulfill_fortune(struct client *superstitious_client){
+	//read into the write buffer and then write out
+	
+	fprintf(stderr, "Reading a fortune for our client!\n");
 	//lol you thought I would implement this so soon???
+	int bytes_received = 0;
+	int bytes_available = superstitious_client->write_buffer_size - superstitious_client->bytes_read;
+	//check to see if we need to make our buffer bigger!
+	if(bytes_available == 0){
+		resize_buffer(superstitious_client, RESIZE_WRITE_BUFFER);
+		//also update how much room we have to read since we just resized
+		bytes_available = superstitious_client->write_buffer_size - superstitious_client->bytes_read;
+	}
+	
+	//fprintf(stderr, "We have room for %d more bytes in read buffer for this client\n", bytes_available);
+	bytes_received = read(superstitious_client->fortune_fd, superstitious_client->write_buffer + superstitious_client->bytes_read, bytes_available); 
+	superstitious_client->bytes_read  += bytes_received;
+	
+	//check if full response
+	fprintf(stderr, "RESPONSE FOR FORTUNE:\n\n%s\n", superstitious_client->write_buffer);
 	
 }
 
@@ -298,6 +316,41 @@ void fill_write_buffer(struct client *processed_client, int type){
 	}
 	else if(type == TYPE_FORTUNE){
 		//fork and exec here and then return to main loop to read from new fd
+		int fortune_pipe[2];
+		if(pipe(fortune_pipe) == -1){
+			fprintf(stderr, "Unable to create pipe!\n");
+		}
+		
+		int pid = fork();
+		if(pid == 0){
+			char *argv[2] = {"/usr/bin/fortune", NULL};
+			fprintf(stderr, "Child process, execing /usr/bin/fortune\n");
+
+			//redirect stdout
+			dup2(fortune_pipe[1], STDOUT_FILENO);
+			close(fortune_pipe[0]);
+			close(fortune_pipe[1]);
+			
+			if(execv("/usr/bin/fortune", argv) == -1){
+				fprintf(stderr, "Failure to execv fortune!\n");
+				exit(-5);
+			}
+		}
+		else{
+			fprintf(stderr, "Parent process, now we save new fd to parent!\n");
+			close(fortune_pipe[1]);
+			//save the new fd to the client
+			processed_client->fortune_fd = fortune_pipe[0];
+		}
+	
+		//write the header and the fortune begin to the write buffer
+		sprintf(processed_client->write_buffer, GENERIC_HEADER, processed_client->response_http_version, 300); //300 is random. not sure if necessary
+		processed_client->bytes_read = strlen(processed_client->write_buffer); //reset bytes read
+		//add on beginning of fortune json content
+		sprintf(processed_client->write_buffer + processed_client->bytes_read, FORTUNE_HEADER); 
+		processed_client->bytes_read = strlen(processed_client->write_buffer); //reset bytes read
+		
+		fprintf(stderr, "Beginning of fortune output:\n\n%s\n", processed_client->write_buffer);
 		processed_client->current_step = FORTUNE_STATE;
 	}
 	else if(type == TYPE_QUIT){
