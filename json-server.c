@@ -276,7 +276,7 @@ void fulfill_fortune(struct client *superstitious_client){
 	fprintf(stderr, "Reading a fortune for our client!\n");
 	//lol you thought I would implement this so soon???
 	int bytes_received = 0;
-	int finished_reading = 0;
+	char *eof_pointer = NULL;
 	int bytes_available = superstitious_client->write_buffer_size - superstitious_client->bytes_read;
 	//check to see if we need to make our buffer bigger!
 	if(bytes_available == 0){
@@ -288,7 +288,6 @@ void fulfill_fortune(struct client *superstitious_client){
 	bytes_received = read(superstitious_client->fortune_fd, superstitious_client->write_buffer + superstitious_client->bytes_read, bytes_available); 
 	if(bytes_received == -1){
 		fprintf(stderr, "Read failed for fortune!\n");
-		finished_reading = 1;
 	}
 	if(bytes_received < bytes_available){
 		fprintf(stderr, "Nothing left from read????\n");
@@ -298,7 +297,9 @@ void fulfill_fortune(struct client *superstitious_client){
 	
 	//check if full response
 	fprintf(stderr, "RESPONSE FOR FORTUNE:\n\n%s\n", superstitious_client->write_buffer);
-	if(finished_reading){
+	if(strchr(superstitious_client->write_buffer, EOF)){
+		superstitious_client->write_buffer -= 1; //move back before EOF
+		superstitious_client->write_buffer = eof_pointer; //move so we can overwrite EOF	
 		sprintf(superstitious_client->write_buffer + superstitious_client->bytes_read, "%s", " \"}\r\n");
 		superstitious_client->current_step = WRITE_STATE;
 	}
@@ -354,6 +355,7 @@ void fill_write_buffer(struct client *processed_client, int type){
 			processed_client->fortune_fd = fortune_pipe[0];
 			if(fortune_pipe[0] > largest_fd){
 				largest_fd = fortune_pipe[0];
+				make_non_blocking(fortune_pipe[0]);
 			}
 		}
 	
@@ -364,7 +366,7 @@ void fill_write_buffer(struct client *processed_client, int type){
 		sprintf(processed_client->write_buffer + processed_client->bytes_read, FORTUNE_HEADER); 
 		processed_client->bytes_read = strlen(processed_client->write_buffer); //reset bytes read
 		
-		fprintf(stderr, "Beginning of fortune output:\n\n%s\n", processed_client->write_buffer);
+		//fprintf(stderr, "Beginning of fortune output:\n\n%s\n", processed_client->write_buffer);
 		processed_client->current_step = FORTUNE_STATE;
 	}
 	else if(type == TYPE_QUIT){
