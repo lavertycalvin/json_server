@@ -273,8 +273,7 @@ void resize_buffer(struct client *full_client, int buffer){
 void fulfill_fortune(struct client *superstitious_client){
 	//read into the write buffer and then write out
 	
-	fprintf(stderr, "Reading a fortune for our client!\n");
-	//lol you thought I would implement this so soon???
+	//fprintf(stderr, "Reading a fortune for our client!\n");
 	int bytes_received = 0;
 	int bytes_available = superstitious_client->write_buffer_size - superstitious_client->bytes_read;
 	//check to see if we need to make our buffer bigger!
@@ -445,11 +444,11 @@ void write_to_client(struct client *client_response){
 	int bytes_sent = 0;
 	int bytes_available = client_response->response_size - client_response->bytes_written;
 	
-	fprintf(stderr, "In write buffer:\n%s\n\n", client_response->write_buffer);
-	fprintf(stderr, "We need to write %d more bytes to this client\n", bytes_available);
+	//fprintf(stderr, "In write buffer:\n%s\n\n", client_response->write_buffer);
+	//fprintf(stderr, "We need to write %d more bytes to this client\n", bytes_available);
 	bytes_sent = send(client_response->socket_fd, client_response->write_buffer + client_response->bytes_written, bytes_available, 0); 
 	client_response->bytes_written += bytes_sent;
-	fprintf(stderr, "Bytes sent so far: %d\n", client_response->bytes_written);
+	//fprintf(stderr, "Bytes sent so far: %d\n", client_response->bytes_written);
 	
 	//check to see if we have finished sending the response
 	if(client_response->bytes_written == client_response->response_size){
