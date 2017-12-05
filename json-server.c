@@ -133,6 +133,12 @@ void create_listening_socket(char *char_address){
 			//fprintf(stderr, "Create socket error...\n");
 			continue;
 		}
+		if(char_address == NULL){ //not passed an address
+			//turn off the IPv6 Only option
+			int no = 0;
+			fprintf(stderr, "Setting socket options!\n");
+			setsockopt(listening_socket_fd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&no, sizeof(no)); 
+		}
 		//fprintf(stderr, "Designated FD for listening socket: %d\n", listening_socket_fd);
 		bind_ret = bind(listening_socket_fd, server->ai_addr, server->ai_addrlen);
 		if(bind_ret == -1){
@@ -626,20 +632,21 @@ int main(int argc, char **argv){
 	
 	
 	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family   = AF_UNSPEC; //either v4 or v6
 	hints.ai_socktype = SOCK_STREAM; //tcp 
 
 	if(argc >= 2){
 		//fprintf(stderr, "Setting TCP port to bind to this address: %s\n", argv[1]);
-		hints.ai_family   = AF_UNSPEC; //either v4 or v6
 		if((get_info_ret = getaddrinfo(argv[1], "0", &hints, &matches)) != 0){
 			fprintf(stderr, "Error with addresses: %s\n", gai_strerror(get_info_ret));
-		}	
+		}
+		create_listening_socket(argv[1]);	
 	}
 	else{
 		//we were not provided with a binding address, bind to all
 		//fprintf(stderr, "Setting TCP port to bind any address!\n");
-		hints.ai_family   = AF_INET6;
 		hints.ai_flags    = AI_PASSIVE; //bind to all addresses
+		hints.ai_family   = AF_INET6; //v6
 		if((get_info_ret = getaddrinfo(NULL, "0", &hints, &matches)) != 0){
 			fprintf(stderr, "Error with addresses: %s\n", gai_strerror(get_info_ret));
 		}	
