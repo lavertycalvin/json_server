@@ -242,11 +242,11 @@ int is_full_response(struct client *process_client){
  * 	RESIZE_WRITE_BUFFER
  */
 void resize_buffer(struct client *full_client, int buffer){
-	fprintf(stderr, "\n"
-			"========================================\n"
-			"             RESIZING BUFFER!!!         \n"
-			"========================================\n"
-			"\n");
+	//fprintf(stderr, "\n"
+	//		"========================================\n"
+	//		"             RESIZING BUFFER!!!         \n"
+	//		"========================================\n"
+	//		"\n");
 	
 	char *rw_buffer = NULL;
 	if(buffer == RESIZE_READ_BUFFER){
@@ -335,7 +335,7 @@ void fill_write_buffer(struct client *processed_client, int type){
 		int pid = fork();
 		if(pid == 0){
 			char *argv[2] = {"/usr/bin/fortune", NULL};
-			fprintf(stderr, "Child process, execing /usr/bin/fortune\n");
+			//fprintf(stderr, "Child process, execing /usr/bin/fortune\n");
 
 			//redirect stdout
 			dup2(fortune_pipe[1], STDOUT_FILENO);
@@ -348,7 +348,7 @@ void fill_write_buffer(struct client *processed_client, int type){
 			}
 		}
 		else{
-			fprintf(stderr, "Parent process, now we save new fd to parent!\n");
+			//fprintf(stderr, "Parent process, now we save new fd to parent!\n");
 			close(fortune_pipe[1]);
 			//save the new fd to the client
 			processed_client->fortune_fd = fortune_pipe[0];
