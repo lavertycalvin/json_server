@@ -276,6 +276,7 @@ void fulfill_fortune(struct client *superstitious_client){
 	fprintf(stderr, "Reading a fortune for our client!\n");
 	//lol you thought I would implement this so soon???
 	int bytes_received = 0;
+	int finished_reading = 0;
 	int bytes_available = superstitious_client->write_buffer_size - superstitious_client->bytes_read;
 	//check to see if we need to make our buffer bigger!
 	if(bytes_available == 0){
@@ -290,13 +291,17 @@ void fulfill_fortune(struct client *superstitious_client){
 	}
 	if(bytes_received < bytes_available){
 		fprintf(stderr, "Nothing left from read????\n");
+		finished_reading = 1;
 	}
 	
 	superstitious_client->bytes_read  += bytes_received;
 	
 	//check if full response
 	fprintf(stderr, "RESPONSE FOR FORTUNE:\n\n%s\n", superstitious_client->write_buffer);
-	
+	if(finished_reading){
+		sprintf(superstitious_client->write_buffer + superstitious_client->bytes_read, "%s", " \"}\r\n");
+		superstitious_client->current_step = WRITE_STATE;
+	}
 }
 
 /* type indicates what to fill the buffer with:
