@@ -285,23 +285,24 @@ void fulfill_fortune(struct client *superstitious_client){
 	}
 	
 	bytes_received = read(superstitious_client->fortune_fd, superstitious_client->write_buffer + superstitious_client->bytes_read, bytes_available); 
-	fprintf(stderr, "Number of bytes_read = %d\n", bytes_received);
+	//fprintf(stderr, "Number of bytes_read = %d\n", bytes_received);
 	if(bytes_received == -1){
-		fprintf(stderr, "Read failed for fortune!\n");
+		//fprintf(stderr, "Read failed for fortune!\n");
 	}
 	if(bytes_received < bytes_available){
-		fprintf(stderr, "Nothing left from read????\n");
+		//fprintf(stderr, "Nothing left from read????\n");
 	}
 	if(bytes_received == 0){
 		sprintf(superstitious_client->write_buffer + superstitious_client->bytes_read, "%s", " \"}\r\n");
 		superstitious_client->current_step = WRITE_STATE;
+		superstitious_client->response_size = strlen(superstitious_client->write_buffer);
 	}
 
 	
 	superstitious_client->bytes_read  += bytes_received;
 	
 	//check if full response
-	fprintf(stderr, "RESPONSE FOR FORTUNE:\n\n%s\n", superstitious_client->write_buffer);
+	//fprintf(stderr, "RESPONSE FOR FORTUNE:\n\n%s\n", superstitious_client->write_buffer);
 }
 
 /* type indicates what to fill the buffer with:
