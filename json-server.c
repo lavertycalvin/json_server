@@ -284,8 +284,14 @@ void fulfill_fortune(struct client *superstitious_client){
 		bytes_available = superstitious_client->write_buffer_size - superstitious_client->bytes_read;
 	}
 	
-	//fprintf(stderr, "We have room for %d more bytes in read buffer for this client\n", bytes_available);
 	bytes_received = read(superstitious_client->fortune_fd, superstitious_client->write_buffer + superstitious_client->bytes_read, bytes_available); 
+	if(bytes_received == -1){
+		fprintf(stderr, "Read failed for fortune!\n");
+	}
+	if(bytes_received < bytes_available){
+		fprintf(stderr, "Nothing left from read????\n");
+	}
+	
 	superstitious_client->bytes_read  += bytes_received;
 	
 	//check if full response
