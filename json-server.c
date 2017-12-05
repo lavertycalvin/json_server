@@ -566,11 +566,11 @@ void select_loop(){
 int get_port(struct sockaddr *server){
 	uint16_t port = 0;
 	if(server->sa_family == AF_INET){
-		//fprintf(stderr, "Used IPv4 binding!\n");
+		fprintf(stderr, "Used IPv4 binding!\n");
 		port = ((struct sockaddr_in *)server)->sin_port;
 	}
 	else{
-		//fprintf(stderr, "Used IPv6 binding!\n");
+		fprintf(stderr, "Used IPv6 binding!\n");
 		port = ((struct sockaddr_in6 *)server)->sin6_port;
 	}
 	return ntohs(port);
@@ -610,11 +610,11 @@ int main(int argc, char **argv){
 	
 	
 	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family   = AF_UNSPEC; //either v4 or v6
 	hints.ai_socktype = SOCK_STREAM; //tcp 
 
 	if(argc >= 2){
 		//fprintf(stderr, "Setting TCP port to bind to this address: %s\n", argv[1]);
+		hints.ai_family   = AF_UNSPEC; //either v4 or v6
 		if((get_info_ret = getaddrinfo(argv[1], "0", &hints, &matches)) != 0){
 			fprintf(stderr, "Error with addresses: %s\n", gai_strerror(get_info_ret));
 		}	
@@ -622,6 +622,7 @@ int main(int argc, char **argv){
 	else{
 		//we were not provided with a binding address, bind to all
 		//fprintf(stderr, "Setting TCP port to bind any address!\n");
+		hints.ai_family   = AF_INET6;
 		hints.ai_flags    = AI_PASSIVE; //bind to all addresses
 		if((get_info_ret = getaddrinfo(NULL, "0", &hints, &matches)) != 0){
 			fprintf(stderr, "Error with addresses: %s\n", gai_strerror(get_info_ret));
