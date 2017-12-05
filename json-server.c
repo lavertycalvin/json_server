@@ -347,6 +347,9 @@ void fill_write_buffer(struct client *processed_client, int type){
 			close(fortune_pipe[1]);
 			//save the new fd to the client
 			processed_client->fortune_fd = fortune_pipe[0];
+			if(fortune_pipe[0] > largest_fd){
+				largest_fd = fortune_pipe[0];
+			}
 		}
 	
 		//write the header and the fortune begin to the write buffer
